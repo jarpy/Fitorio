@@ -3,7 +3,7 @@ import asyncio
 import struct
 
 import factorio_rcon
-from bleak import BleakClient
+from bleak import BleakClient, BleakScanner
 
 from fitorio.constants import HEART_RATE_MEASUREMENT_CHAR_UUID, HEART_RATE_SERVICE_UUID
 
@@ -21,7 +21,21 @@ async def heart_rate_notification_handler(_, data: bytearray):
     factorio.send_command("/command helpers.write_file('rt.txt', game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature, false, 1)")
 
 async def main():
-    async with BleakClient("A0:9E:1A:DF:24:31") as client:
+    print("Scanning for devices...")
+    devices = await BleakScanner.discover()
+    polar_h10_device = None
+    for device in [d for d in devices if d.name is not None]:
+        print(f"Found device: {device.name} - {device.address}")
+        if "Polar H10" in device.name:
+            polar_h10_device = device
+            break
+
+    if not polar_h10_device:
+        print("Polar H10 not found.")
+        return
+
+    # Connect to the Polar H10
+    async with BleakClient(polar_h10_device.address) as client:
         print(f"Connected: {client.is_connected}")
         services = client.services
         for service in services:
