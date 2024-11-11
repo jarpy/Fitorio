@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fitorio"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.13"
+factorio-rcon-py = "^2.1.3"
+bleak = "^0.22.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.29.0"
+mypy = "^1.13.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
