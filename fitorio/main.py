@@ -21,6 +21,8 @@ PnP_ID_CHAR_UUID = "00002a50-0000-1000-8000-00805f9b34fb"  # PnP ID Characterist
 import asyncio
 from bleak import BleakClient
 
+factorio = factorio_rcon.RCONClient("localhost", 27015, "fakepotato")
+
 async def heart_rate_notification_handler(characteristic, data: bytearray):
     # The heart rate measurement is sent as a byte array
     # The first byte contains the flags, and the second byte contains the heart rate value
@@ -35,6 +37,9 @@ async def heart_rate_notification_handler(characteristic, data: bytearray):
     rr_intervals = struct.unpack("<" + "H" * rr_sample_count, data[2:])
     print(f"BPM={heart_rate_value}", end="\t")
     print(f"RRIs={rr_intervals}")
+    print(f"Setting reactor temperature to {heart_rate_value * 5}")
+    factorio.send_command(render_set_temperature(heart_rate_value * 5))
+    print(factorio.send_command("/command helpers.write_file('rt.txt', game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature, false, 1)"))
 
 async def main():
     async with BleakClient("A0:9E:1A:DF:24:31") as client:
@@ -51,12 +56,9 @@ async def main():
                         await client.start_notify(char.uuid, heart_rate_notification_handler)
                         await asyncio.Future()  # run forever
 
-# f = factorio_rcon.RCONClient("localhost", 27015, "fakepotato")
-
 
 def render_set_temperature(temperature: int) -> str:
-    return "/c game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature = %s" % temperature
+    return "/silent-command game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature = %s" % temperature
 
 if __name__ == "__main__":
     asyncio.run(main())
-    # f.send_command(render_set_temperature(0))
