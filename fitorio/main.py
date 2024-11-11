@@ -19,23 +19,7 @@ PnP_ID_CHAR_UUID = "00002a50-0000-1000-8000-00805f9b34fb"  # PnP ID Characterist
 
 
 import asyncio
-from bleak import BleakScanner, BleakClient
-
-async def connect_to_device(device_address):
-    # Connect to the Polar H10 using its Bluetooth address
-    async with BleakClient(device_address) as client:
-        print(f"Connected to {device_address}")
-
-        # Read the heart rate measurements characteristic
-        # Register for notifications when a new heart rate measurement is received
-        await client.start_notify(HEART_RATE_MEASUREMENT_CHAR_UUID, heart_rate_notification_handler)
-        
-        # Wait for a few notifications to be received
-        await asyncio.sleep(10)  # adjust time as needed to receive heart rate updates
-
-        # Stop notifications after receiving some data
-        await client.stop_notify(HEART_RATE_MEASUREMENT_CHAR_UUID)
-        print("Stopped receiving heart rate notifications.")
+from bleak import BleakClient
 
 async def heart_rate_notification_handler(characteristic, data: bytearray):
     # The heart rate measurement is sent as a byte array
@@ -44,31 +28,15 @@ async def heart_rate_notification_handler(characteristic, data: bytearray):
     # Polar H10 sends heart rate data in the following format:
     # - If flags byte has bit 0 set, the heart rate value is a 16-bit integer
     # - If bit 1 is set, it also includes energy expended (though we will ignore it for now)
-    
     flags = data[0]
-    heart_rate_value = None
+    heart_rate_value = data[1]
+    rr_sample_count = len(data[2:]) // 2
 
-    # Check if the heart rate is 16-bit or 8-bit
-    if flags & 0x01:
-        # 16-bit heart rate (2 bytes)
-        heart_rate_value = struct.unpack('<H', data[1:3])[0]
-    else:
-        # 8-bit heart rate (1 byte)
-        heart_rate_value = data[1]
-
-    print(f"Heart Rate: {heart_rate_value} BPM")
-
-
+    rr_intervals = struct.unpack("<" + "H" * rr_sample_count, data[2:])
+    print(f"BPM={heart_rate_value}", end="\t")
+    print(f"RRIs={rr_intervals}")
 
 async def main():
-    # device = await BleakScanner.find_device_by_address("A0:9E:1A:DF:24:31")
-    # props = (BleakScanner.discovered_devices_and_advertisement_data)
-    # print(props.keys())
-    # print(device)
-
-
-    stop_event = asyncio.Event()
-
     async with BleakClient("A0:9E:1A:DF:24:31") as client:
         print(f"Connected: {client.is_connected}")
         services = client.services
@@ -82,30 +50,6 @@ async def main():
                         print(f"Found Heart Rate Measurement Characteristic: {char.uuid}")
                         await client.start_notify(char.uuid, heart_rate_notification_handler)
                         await asyncio.Future()  # run forever
-                        # await client.stop_notify(char.uuid)
-                        # print("Stopped receiving heart rate notifications.")
-        # Read a characteristic, etc.
-
-    # TODO: add something that calls stop_event.set()
-
-    # def callback(device, advertising_data):
-    #     # TODO: do something with incoming data
-    #     # print(device, advertising_data)
-    #     if device and device.name and "Polar H10" in device.name:
-    #         print(f"Found Polar H10 HRM: {device.name} ({device.address})")
-    #         BleakClient.create_client(device.address, connect_to_device(device.address))
-
-    #     # A0:9E:1A:DF:24:31: Polar H10 DF243120 AdvertisementData(local_name='Polar H10 DF243120', manufacturer_data={107: b'?\x00\x00R'}, service_uuids=['0000180d-0000-1000-8000-00805f9b34fb', '0000feee-0000-1000-8000-00805f9b34fb'], tx_power=4, rssi=-62)
-
-    # async with BleakScanner(callback) as scanner:
-    #     ...
-    #     # Important! Wait for an event to trigger stop, otherwise scanner
-    #     # will stop immediately.
-    #     await stop_event.wait()
-
-    # scanner stops when block exits
-
-
 
 # f = factorio_rcon.RCONClient("localhost", 27015, "fakepotato")
 
