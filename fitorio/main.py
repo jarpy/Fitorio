@@ -34,7 +34,7 @@ async def process_h10_data(_, data: bytearray):
     last_update_time = now
 
     steam_to_add = max(0, (bpm - resting_heart_rate))**heart_rate_to_steam_exponent * elapsed
-    print(f"Adding {steam_to_add} steam for {elapsed} seconds at {bpm} BPM")
+    print(f"Adding {steam_to_add:.1f} steam for {elapsed:.2f} seconds at {bpm} BPM ({steam_to_add*60/elapsed:.0f} steam/min)")
     if steam_to_add > 0:
         factorio.send_command(render_add_steam(steam_to_add))
 
