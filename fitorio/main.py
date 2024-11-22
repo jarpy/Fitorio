@@ -7,10 +7,10 @@ from time import time
 import factorio_rcon
 from bleak import BleakClient, BleakScanner
 
-from fitorio.constants import HEART_RATE_MEASUREMENT_CHAR_UUID, HEART_RATE_SERVICE_UUID
+from fitorio.constants import HEART_RATE_CHARACTERISTIC_UUID, HEART_RATE_SERVICE_UUID
 from typing import Final
 
-resting_heart_rate: Final[int] = 75
+resting_heart_rate: Final[int] = 85
 heart_rate_to_steam_exponent: Final[float] = 2.2
 factorio: factorio_rcon.RCONClient = None
 last_update_time = time()
@@ -61,11 +61,12 @@ async def main():
             if service.uuid == HEART_RATE_SERVICE_UUID:
                 print(f"Found Heart Rate Service: {service.uuid}")
                 characteristics = service.characteristics
-                for char in characteristics:
-                    print(f" - {char.uuid}")
-                    if char.uuid == HEART_RATE_MEASUREMENT_CHAR_UUID:
-                        print(f"Found Heart Rate Measurement Characteristic: {char.uuid}")
-                        await client.start_notify(char.uuid, process_h10_data)
+                for characteristic in characteristics:
+                    uuid = characteristic.uuid
+                    print(f" - {uuid}")
+                    if uuid == HEART_RATE_CHARACTERISTIC_UUID:
+                        print(f"Found Heart Rate Measurement Characteristic: {uuid}")
+                        await client.start_notify(uuid, process_h10_data)
                         await asyncio.Future()  # run forever
 
 
