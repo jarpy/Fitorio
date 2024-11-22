@@ -1,26 +1,46 @@
 
 import asyncio
 import struct
+import sys
+from time import time
 
 import factorio_rcon
 from bleak import BleakClient, BleakScanner
 
 from fitorio.constants import HEART_RATE_MEASUREMENT_CHAR_UUID, HEART_RATE_SERVICE_UUID
+from typing import Final
 
-factorio = factorio_rcon.RCONClient("localhost", 27015, "fakepotato")
+resting_heart_rate: Final[int] = 75
+heart_rate_to_steam_exponent: Final[float] = 2.2
+factorio: factorio_rcon.RCONClient = None
+last_update_time = time()
 
-async def heart_rate_notification_handler(_, data: bytearray):
+
+async def connect_to_factorio():
+    global factorio
+    print("Connecting to Factorio RCON...", end=" ")
+    factorio = factorio_rcon.RCONClient("localhost", 27015, "fakepotato")
+    print("OK.")
+
+
+async def process_h10_data(_, data: bytearray):
+    global last_update_time
     bpm = data[1]
     rr_sample_count = len(data[2:]) // 2
     rr_intervals = struct.unpack("<" + "H" * rr_sample_count, data[2:])
 
-    print(f"BPM={bpm}", end="\t")
-    print(f"RRIs={rr_intervals}")
-    print(f"Setting reactor temperature to {bpm * 5}")
-    factorio.send_command(render_set_temperature(bpm * 5))
-    factorio.send_command("/command helpers.write_file('rt.txt', game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature, false, 1)")
+    now = time()
+    elapsed = now - last_update_time
+    last_update_time = now
+
+    steam_to_add = max(0, (bpm - resting_heart_rate))**heart_rate_to_steam_exponent * elapsed
+    print(f"Adding {steam_to_add} steam for {elapsed} seconds at {bpm} BPM")
+    if steam_to_add > 0:
+        factorio.send_command(render_add_steam(steam_to_add))
+
 
 async def main():
+    await connect_to_factorio()
     print("Scanning for devices...")
     devices = await BleakScanner.discover()
     polar_h10_device = None
@@ -32,9 +52,8 @@ async def main():
 
     if not polar_h10_device:
         print("Polar H10 not found.")
-        return
+        sys.exit(1)
 
-    # Connect to the Polar H10
     async with BleakClient(polar_h10_device.address) as client:
         print(f"Connected: {client.is_connected}")
         services = client.services
@@ -46,12 +65,14 @@ async def main():
                     print(f" - {char.uuid}")
                     if char.uuid == HEART_RATE_MEASUREMENT_CHAR_UUID:
                         print(f"Found Heart Rate Measurement Characteristic: {char.uuid}")
-                        await client.start_notify(char.uuid, heart_rate_notification_handler)
+                        await client.start_notify(char.uuid, process_h10_data)
                         await asyncio.Future()  # run forever
 
 
-def render_set_temperature(temperature: int) -> str:
-    return "/silent-command game.players[1].surface.find_entities_filtered{type='reactor'}[1].temperature = %s" % temperature
+def render_add_steam(amount: int) -> str:
+    command = '/silent-command game.surfaces[1].find_entity("fluid-tank-5x5", {x=27, y=-170}).insert_fluid({name="steam", amount=%s, temperature=500})' % amount
+    # print(command)
+    return command
 
 if __name__ == "__main__":
     asyncio.run(main())
