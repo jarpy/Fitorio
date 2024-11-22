@@ -1,4 +1,3 @@
-
 import asyncio
 import struct
 import sys
@@ -12,6 +11,8 @@ from typing import Final
 
 resting_heart_rate: Final[int] = 85
 heart_rate_to_steam_exponent: Final[float] = 2.2
+steam_storage_entity_name: Final[str] = "fluid-tank-5x5"
+steam_storage_entity_position: Final[tuple[int, int]] = (27, -170)
 factorio: factorio_rcon.RCONClient = None
 last_update_time = time()
 
@@ -26,15 +27,16 @@ async def connect_to_factorio():
 async def process_h10_data(_, data: bytearray):
     global last_update_time
     bpm = data[1]
-    rr_sample_count = len(data[2:]) // 2
-    rr_intervals = struct.unpack("<" + "H" * rr_sample_count, data[2:])
-
     now = time()
     elapsed = now - last_update_time
     last_update_time = now
 
-    steam_to_add = max(0, (bpm - resting_heart_rate))**heart_rate_to_steam_exponent * elapsed
-    print(f"Adding {steam_to_add:.1f} steam for {elapsed:.2f} seconds at {bpm} BPM ({steam_to_add*60/elapsed:.0f} steam/min)")
+    steam_to_add = (
+        max(0, (bpm - resting_heart_rate)) ** heart_rate_to_steam_exponent * elapsed
+    )
+    print(
+        f"Adding {steam_to_add:.1f} steam for {elapsed:.2f} seconds at {bpm} BPM ({steam_to_add*60/elapsed:.0f} steam/min)"
+    )
     if steam_to_add > 0:
         factorio.send_command(render_add_steam(steam_to_add))
 
@@ -71,9 +73,12 @@ async def main():
 
 
 def render_add_steam(amount: int) -> str:
-    command = '/silent-command game.surfaces[1].find_entity("fluid-tank-5x5", {x=27, y=-170}).insert_fluid({name="steam", amount=%s, temperature=500})' % amount
-    # print(command)
+    command = (
+        '/silent-command game.surfaces[1].find_entity("%s", {x=%s, y=%s}).insert_fluid({name="steam", amount=%s, temperature=500})'
+        % (steam_storage_entity_name, *steam_storage_entity_position, amount)
+    )
     return command
+
 
 if __name__ == "__main__":
     asyncio.run(main())
